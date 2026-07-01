@@ -21,4 +21,4 @@ When using the **RealFuels** mod in Kerbal Space Program's Career mode, the stoc
 3. Unzip the archive and place the `RealFuelsCostFix` folder inside your `GameData/` directory.
 
 ## 📜 License
-This project is licensed under the [MIT License](LICENSE.txt). Feel free to fork, modify, and distribute.
+This project is licensed under the [MIT License](https://github.com/NovaSpem/RealFuelsCostFix/raw/refs/heads/main/LICENSE). Feel free to fork, modify, and distribute.
