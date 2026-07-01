@@ -17,7 +17,7 @@ When using the **RealFuels** mod in Kerbal Space Program's Career mode, the stoc
 
 ## 📦 Installation & Dependencies
 1. Install **ModuleManager** and **RealFuels** (required).
-2. Download the latest release from the [Releases](https://github.com/NovaSpem/RemoteTechBlackoutFix/releases) tab.
+2. Download the latest release from the [Releases](https://github.com/NovaSpem/RealFuelsCostFix/releases) tab.
 3. Unzip the archive and place the `RealFuelsCostFix` folder inside your `GameData/` directory.
 
 ## 📜 License
