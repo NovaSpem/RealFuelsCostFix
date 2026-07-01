@@ -11,7 +11,7 @@ When using the **RealFuels** mod in Kerbal Space Program's Career mode, the stoc
 **RealFuels** Cost Fix обходит этот баг ванильного калькулятора KSP и принудительно внедряет математически формулу расчета стоимости через  IPartCostModifier.
 
 ### Key Features:
-* **Perfect Cost Symmetry:** Fueling a tank increases the price correctly. Emptying a tank smoothly transitions the cost, locking the dry tank shell exactly at its factory value.
+* **Perfect Cost Symmetry:** Fueling a tank correctly increases the price. Emptying a tank smoothly transitions the cost, locking the dry tank shell exactly at its factory value.
 * **Utilization Support:** Fully compatible with the "Tank Volume / Utilization" slider. The tank shell price remains rock-solid and predictable no matter how you scale your inner tank configuration.
 * **Multi-Fuel Component UI:** Adds a clean, dynamic indicator to the Part Action Window (PAW) right-click menu showing the overall fill percentage and individual percentages/liters for up to 5 loaded fuel types simultaneously (e.g., `LqdOxygen: 73.7% (1474 / 2000 L)`).
 
