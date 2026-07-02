@@ -8,7 +8,7 @@ When using the **RealFuels** mod in Kerbal Space Program's Career mode, the stoc
 2. **Tank cost becomes negative depending on fuel cost:** When you modify the fuel configuration or empty the tank, the stock KSP calculator tries to subtract phantom vanilla resources from the part. This pushes the base tank shell price below zero into negative numbers, completely ruining the Career mode budget balance.
 
 ## 🚀 The Solution
-**RealFuels** Cost Fix обходит этот баг ванильного калькулятора KSP и принудительно внедряет математически формулу расчета стоимости через  IPartCostModifier.
+**RealFuels** Cost Fix bypasses this bug of the vanilla KSP calculator and forcibly implements the mathematical formula for calculating the cost through IPartCostModifier.
 
 ### Key Features:
 * **Perfect Cost Symmetry:** Fueling a tank correctly increases the price. Emptying a tank smoothly transitions the cost, locking the dry tank shell exactly at its factory value.
