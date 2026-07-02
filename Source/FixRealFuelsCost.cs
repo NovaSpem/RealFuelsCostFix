@@ -1,5 +1,6 @@
 using UnityEngine;
 using System;
+using System.Reflection;
 using System.Collections.Generic;
 
 namespace RealFuelsPercentUI
@@ -33,7 +34,7 @@ namespace RealFuelsPercentUI
                     part.partPrefab.AddModule("ModuleRealFuelsPercent");
                 }
             }
-            Debug.Log("[RF-PercentUI] Оптимизированный событийный модуль успешно добавлен!");
+            Debug.Log("[RF-CostFix] The RF price conversion module is loaded!");
         }
     }
 
@@ -49,10 +50,12 @@ namespace RealFuelsPercentUI
         [KSPField(guiActive = false, guiActiveEditor = false, guiName = "Топливо 5")] public string res5 = "";
 
         private List<BaseField> guiFields = new List<BaseField>();
-        
-        // Кэшируем финальное значение стоимости, чтобы не гонять циклы каждую миллисекунду
         private float cachedModifierCost = 0f;
+        
+        // Change tracking variables
         private float lastPercent = -1f;
+        private double lastVolume = -1.0;
+        private double lastMaxTotal = -1.0;
 
         public override void OnStart(StartState state)
         {
@@ -65,50 +68,69 @@ namespace RealFuelsPercentUI
                     if (f != null) guiFields.Add(f);
                 }
             }
-
-            // Первичный расчет при спавне детали в ангаре
             RecalculateData();
         }
 
-        // Вместо тяжелого Update() мы используем LateUpdate(), но встраиваем в него «спящий» режим.
-        // Код сработает только тогда, когда суммарный объем ресурсов физически изменился.
         public void LateUpdate()
         {
-            if (!HighLogic.LoadedSceneIsEditor || part == null || part.Resources == null) return;
+            if (!HighLogic.LoadedSceneIsEditor || part == null || part.Modules == null) return;
 
             double currentTotal = 0;
             double maxTotal = 0;
+            double currentRFVolume = 0;
 
-            foreach (PartResource res in part.Resources)
+            // Reading the physical volume of the RealFuels tank
+            foreach (PartModule pm in part.Modules)
             {
-                if (res == null) continue;
-                currentTotal += res.amount;
-                maxTotal += res.maxAmount;
+                if (pm != null && pm.GetType().Name == "ModuleFuelTanks")
+                {
+                    try
+                    {
+                        FieldInfo vField = pm.GetType().GetField("volume", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (vField != null)
+                        {
+                            currentRFVolume = Convert.ToDouble(vField.GetValue(pm));
+                        }
+                    }
+                    catch { }
+                    break;
+                }
             }
 
-            if (maxTotal > 0)
+            if (part.Resources != null)
             {
-                float currentPercent = (float)((currentTotal / maxTotal) * 100.0);
-
-                // Если ползунок сдвинулся с прошлого кадра — просыпаемся и пересчитываем все строки и кэш цены
-                if (Mathf.Abs(currentPercent - lastPercent) > 0.01f)
+                foreach (PartResource res in part.Resources)
                 {
-                    lastPercent = currentPercent;
-                    RecalculateData();
+                    if (res == null) continue;
+                    currentTotal += res.amount;
+                    maxTotal += res.maxAmount;
+                }
+            }
 
-                    // Принудительно заставляем KSP перерисовать ценник ракеты в углу экрана
-                    if (EditorLogic.fetch != null && EditorLogic.fetch.ship != null)
-                    {
-                        GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
-                    }
+            float currentPercent = maxTotal > 0 ? (float)((currentTotal / maxTotal) * 100.0) : 0f;
+
+            // CHECK: We wake up if the percentage, OR the volume, OR the maximum capacity of resources has changed 
+            if (Mathf.Abs(currentPercent - lastPercent) > 0.01f || 
+                Mathf.Abs((float)(currentRFVolume - lastVolume)) > 0.01f ||
+                Mathf.Abs((float)(maxTotal - lastMaxTotal)) > 0.01f)
+            {
+                lastPercent = currentPercent;
+                lastVolume = currentRFVolume;
+                lastMaxTotal = maxTotal;
+                
+                RecalculateData();
+
+                // Kicking the KSP to redraw the cost interface of the entire rocket
+                if (EditorLogic.fetch != null && EditorLogic.fetch.ship != null)
+                {
+                    GameEvents.onEditorShipModified.Fire(EditorLogic.fetch.ship);
                 }
             }
         }
 
-        // Основной оптимизированный метод сбора данных (запускается только при движении ползунков)
         private void RecalculateData()
         {
-            if (part == null || part.Resources == null || part.partInfo == null) return;
+            if (part == null || part.partInfo == null) return;
 
             try
             {
@@ -119,48 +141,67 @@ namespace RealFuelsPercentUI
                 float bonusCost1 = 0f; 
                 float bonusCost2 = 0f; 
 
-                int fieldIndex = 0;
-
-                foreach (PartResource res in part.Resources)
+                double currentRFVolume = 0;
+                foreach (PartModule pm in part.Modules)
                 {
-                    if (res == null) continue;
-
-                    currentTotalAmount += res.amount;
-                    maxTotalAmount += res.maxAmount;
-
-                    float unitCost = res.info != null ? res.info.unitCost : 0f;
-                    if (unitCost > 0f)
+                    if (pm != null && pm.GetType().Name == "ModuleFuelTanks")
                     {
-                        if (res.amount > 0) bonusCost1 += (float)(res.amount * unitCost);
-
-                        double missingAmount = res.maxAmount - res.amount;
-                        if (missingAmount > 0) bonusCost2 += (float)(missingAmount * unitCost);
-                    }
-
-                    if (fieldIndex < guiFields.Count)
-                    {
-                        double resourcePercent = res.maxAmount > 0 ? (res.amount / res.maxAmount) * 100.0 : 0.0;
-                        string displayValue = string.Format("{0:F1}% ({1:F0} / {2:F0} л)", resourcePercent, res.amount, res.maxAmount);
-
-                        BaseField field = guiFields[fieldIndex];
-                        field.guiName = res.resourceName;
-
-                        if (fieldIndex == 0) res1 = displayValue;
-                        else if (fieldIndex == 1) res2 = displayValue;
-                        else if (fieldIndex == 2) res3 = displayValue;
-                        else if (fieldIndex == 3) res4 = displayValue;
-                        else if (fieldIndex == 4) res5 = displayValue;
-
-                        field.guiActive = true;
-                        field.guiActiveEditor = true;
-                        fieldIndex++;
+                        FieldInfo vField = pm.GetType().GetField("volume", BindingFlags.Public | BindingFlags.Instance | BindingFlags.NonPublic);
+                        if (vField != null) currentRFVolume = Convert.ToDouble(vField.GetValue(pm));
+                        break;
                     }
                 }
 
-                // Записываем финальную целевую стоимость в кэш-память
+                int fieldIndex = 0;
+
+                if (part.Resources != null && currentRFVolume > 0.001)
+                {
+                    foreach (PartResource res in part.Resources)
+                    {
+                        if (res == null) continue;
+
+                        currentTotalAmount += res.amount;
+                        maxTotalAmount += res.maxAmount;
+
+                        float unitCost = res.info != null ? res.info.unitCost : 0f;
+                        if (unitCost > 0f)
+                        {
+                            if (res.amount > 0) bonusCost1 += (float)(res.amount * unitCost);
+
+                            double missingAmount = res.maxAmount - res.amount;
+                            if (missingAmount > 0) bonusCost2 += (float)(missingAmount * unitCost);
+                        }
+
+                        if (fieldIndex < guiFields.Count)
+                        {
+                            double resourcePercent = res.maxAmount > 0 ? (res.amount / res.maxAmount) * 100.0 : 0.0;
+                            string displayValue = string.Format("{0:F1}% ({1:F0} / {2:F0} л)", resourcePercent, res.amount, res.maxAmount);
+
+                            BaseField field = guiFields[fieldIndex];
+                            field.guiName = res.resourceName;
+
+                            if (fieldIndex == 0) res1 = displayValue;
+                            else if (fieldIndex == 1) res2 = displayValue;
+                            else if (fieldIndex == 2) res3 = displayValue;
+                            else if (fieldIndex == 3) res4 = displayValue;
+                            else if (fieldIndex == 4) res5 = displayValue;
+
+                            field.guiActive = true;
+                            field.guiActiveEditor = true;
+                            fieldIndex++;
+                        }
+                    }
+                }
+
+                if (currentRFVolume <= 0.001)
+                {
+                    bonusCost1 = 0f;
+                    bonusCost2 = 0f;
+                }
+
                 cachedModifierCost = basePartCost + bonusCost1 + bonusCost2; 
 
-                if (maxTotalAmount > 0)
+                if (maxTotalAmount > 0 && currentRFVolume > 0.001)
                 {
                     percentString = string.Format("{0:F1}%", (currentTotalAmount / maxTotalAmount) * 100.0);
                 }
@@ -189,11 +230,8 @@ namespace RealFuelsPercentUI
             }
         }
 
-        // --- УЛЬТРА-БЫСТРЫЙ ИНТЕРФЕЙС СТОИМОСТИ KSP ---
         public float GetModuleCost(float defaultCost, ModifierStagingSituation situation)
         {
-            // Метод GetModuleCost вызывается KSP десятки раз за секунду. 
-            // Благодаря кэшированию, вместо тяжелых циклов и строк, он мгновенно отдает готовую дельту из памяти!
             if (cachedModifierCost <= 0.001f) return 0f;
             return cachedModifierCost - defaultCost;
         }
